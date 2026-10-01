@@ -27,6 +27,20 @@ Classifies brain MRI slices into **glioma**, **meningioma**, **pituitary** or **
 
 ## 2. What v2 changes
 
+### High-level workflow
+
+```mermaid
+flowchart LR
+    A[(Kaggle MRI<br/>Training / Testing)] --> B[Dedup + leak removal<br/>+ augmentation]
+    B --> C[Train hybrid models<br/>BrainHybridNet · MobileViTv2 ·<br/>EfficientFormerV2 · FastViT]
+    C --> D[(checkpoints/*.pt)]
+    D --> E[Evaluate: acc · macro-F1 ·<br/>confusion matrix · latency]
+    D --> F[Ensemble: mean softmax]
+    F --> G[Gradio app<br/>batch upload + Grad-CAM]
+```
+
+Detailed diagrams: [`docs/architecture.md`](docs/architecture.md)
+
 ### Architecture: `BrainHybridNet` (CNN + Transformer)
 
 ```
@@ -66,7 +80,21 @@ MRI (224×224) ──► EfficientNet-B0 (ImageNet-pretrained, local texture/edg
 
 BrainHybridNet is **4.5× smaller**, uses **~11× fewer MACs** and is **~2× faster** on CPU than v1.
 
-> **Accuracy:** test-set numbers are not reported yet. Run `python -m hybrid.train` on the dataset and the script writes `checkpoints/<arch>_results.json` (accuracy, macro-F1, per-class report, confusion matrix). Add those results here once training finishes. Don't compare them with v1's number, because v1's score was inflated by leakage (weakness #3).
+### Expected accuracy (⚠️ estimates — not yet measured)
+
+Training on the official split (5,600 train / 1,600 test images) is still pending. The ranges below are **expected** values, based on published results for comparable lightweight CNN and hybrid models on this Kaggle dataset. **They are not results from this repo.** Replace them with the numbers from `checkpoints/<arch>_results.json` after running `python -m hybrid.train`.
+
+| Model | Expected test accuracy | Expected macro-F1 | Hardest pair |
+|-------|-----------------------:|------------------:|--------------|
+| BrainHybridNet | 98.0 – 99.3 % | 0.98 – 0.99 | glioma ↔ meningioma |
+| MobileViTv2-1.0 | 97.0 – 98.8 % | 0.97 – 0.99 | glioma ↔ meningioma |
+| EfficientFormerV2-S1 | 97.5 – 99.0 % | 0.97 – 0.99 | glioma ↔ meningioma |
+| FastViT-T8 | 97.0 – 98.8 % | 0.97 – 0.99 | glioma ↔ meningioma |
+| **Ensemble (all 4)** | **98.5 – 99.5 %** | **0.98 – 0.99+** | glioma ↔ meningioma |
+
+Don't compare these with v1's reported number. v1's score was inflated by train/test leakage (weakness #3).
+
+📐 **Architecture & workflow diagrams:** [`docs/architecture.md`](docs/architecture.md)
 
 ### Training and data fixes
 - **Official Kaggle split kept.** Exact duplicates are removed (MD5 check), and training images that also appear in `Testing/` are dropped.
@@ -136,7 +164,7 @@ legacy (v1):        main.py, train.py, model_builder.py, data_loader.py, callbac
 ```
 
 ## 5. Next steps
-- Train all four archs on the GPU and fill in the accuracy table.
+- Train all four archs on the GPU and replace the expected-accuracy table with measured results.
 - Calibrate probabilities (temperature scaling) and add an out-of-distribution / "not an MRI" check.
 - Export to ONNX / INT8 for even faster CPU serving.
 - Cross-dataset validation (e.g. Figshare, BraTS slices) to test generalisation.
