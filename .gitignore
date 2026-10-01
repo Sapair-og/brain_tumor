@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+*.pyc
+checkpoints/
+temp_splits/
+brain_tumor_data/
+*.keras
+.gradio/
